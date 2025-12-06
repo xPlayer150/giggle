@@ -1,6 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { doc, getDoc } from "firebase/firestore";
 import React, { useState } from 'react';
+import { db } from "../constants/firebase";
+
 import {
     KeyboardAvoidingView,
     Platform,
@@ -41,14 +44,30 @@ export default function LogInScreen() {
         try {
             setLoading(true);
 
-            await signInWithEmailAndPassword(auth, email.trim(), password.trim());
+            const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password.trim());
+            const user = userCredential.user;
 
-            router.replace('/teens/home');
+            // 🔥 Fetch userType from Firestore
+            const userRef = doc(db, "users", user.uid);
+            const snap = await getDoc(userRef);
+
+            if (!snap.exists()) {
+                setErrorMessage("User profile not found.");
+                return;
+            }
+
+            const { userType } = snap.data();
+
+            // 🔥 Route based on userType
+            if (userType === "teen") {
+                router.push("/elders/home");
+            } else {
+                router.push("/teens/home");
+            }
 
         } catch (error: any) {
             console.log(error);
 
-            // Friendly error messages
             if (error.code === 'auth/invalid-credential') {
                 setErrorMessage("Incorrect email or password.");
             } else if (error.code === 'auth/too-many-requests') {

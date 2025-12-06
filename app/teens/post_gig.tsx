@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from "react";
 import {
+    Alert,
     Modal,
     ScrollView,
     StyleSheet,
@@ -41,6 +42,7 @@ export default function PostGig({ visible, onClose }: PostGigProps) {
     const hideDatePicker = () => setDatePickerVisible(false);
 
     const handleConfirmDate = (selectedDate: Date) => {
+        // store readable & ISO
         const formatted = selectedDate.toDateString(); // Example: "Mon Jan 20 2025"
         setDate(formatted);
         hideDatePicker();
@@ -56,6 +58,8 @@ export default function PostGig({ visible, onClose }: PostGigProps) {
     };
 
     const handleClose = () => {
+        // optionally prevent closing while loading
+        if (loading) return;
         resetForm();
         onClose();
     };
@@ -63,8 +67,15 @@ export default function PostGig({ visible, onClose }: PostGigProps) {
     const handlePostGig = async () => {
         setError("");
 
-        if (!title || !description || !pay || !location || !date) {
+        // Basic validation
+        if (!title.trim() || !description.trim() || !pay.trim() || !location.trim() || !date.trim()) {
             setError("Please fill in all fields.");
+            return;
+        }
+
+        const numericPay = Number(pay);
+        if (isNaN(numericPay) || numericPay < 0) {
+            setError("Pay must be a valid non-negative number (e.g. 20).");
             return;
         }
 
@@ -77,22 +88,52 @@ export default function PostGig({ visible, onClose }: PostGigProps) {
         try {
             setLoading(true);
 
-            await addDoc(collection(db, "gigs"), {
-                title,
-                description,
-                pay: Number(pay),
-                location,
+            const docRef = await addDoc(collection(db, "gigs"), {
+                title: title.trim(),
+                description: description.trim(),
+                // store price as string like "$20" so elders UI matches
+                price: `$${numericPay}`,
+                postedBy: user.displayName,
+                category: "General",
+                location: location.trim(),
                 date,
                 userId: user.uid,
+                email: auth.currentUser?.email,
                 createdAt: serverTimestamp(),
                 status: "open",
             });
 
-            resetForm();
-            onClose();
-        } catch (e) {
-            console.log(e);
-            setError("Failed to post gig. Try again.");
+            console.log("✅ Gig posted, id:", docRef.id);
+
+            // Success alert — wait for user to acknowledge before closing/resetting
+            Alert.alert(
+                "Gig posted",
+                "Your gig was posted successfully and will appear for elders.",
+                [
+                    {
+                        text: "OK",
+                        onPress: () => {
+                            resetForm();
+                            onClose();
+                        },
+                    },
+                ],
+                { cancelable: false }
+            );
+        } catch (e: any) {
+            console.log("❌ Failed to post gig:", e);
+
+            // Show friendly messages for common Firebase errors if available
+            let friendly = "Failed to post gig. Try again.";
+
+            if (e?.code === "permission-denied") {
+                friendly = "Permission denied. Check your Firestore rules.";
+            } else if (e?.code === "unavailable") {
+                friendly = "Network error. Please check your connection.";
+            }
+
+            setError(friendly);
+            Alert.alert("Error", friendly);
         } finally {
             setLoading(false);
         }
@@ -137,7 +178,7 @@ export default function PostGig({ visible, onClose }: PostGigProps) {
                     {/* Pay */}
                     <TextInput
                         style={styles.input}
-                        placeholder="Pay ($)"
+                        placeholder="Pay (numbers only, e.g. 20)"
                         value={pay}
                         onChangeText={setPay}
                         keyboardType="numeric"
@@ -152,7 +193,7 @@ export default function PostGig({ visible, onClose }: PostGigProps) {
                     />
 
                     {/* Date Picker Button */}
-                    <TouchableOpacity style={styles.input} onPress={showDatePicker}>
+                    <TouchableOpacity style={styles.input} onPress={showDatePicker} disabled={loading}>
                         <Text style={{ color: date ? "#000" : "#888" }}>
                             {date || "Select Date"}
                         </Text>
@@ -166,7 +207,7 @@ export default function PostGig({ visible, onClose }: PostGigProps) {
                     />
 
                     <TouchableOpacity
-                        style={styles.button}
+                        style={[styles.button, loading ? { opacity: 0.6 } : {}]}
                         onPress={handlePostGig}
                         disabled={loading}
                     >

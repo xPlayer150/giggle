@@ -1,27 +1,18 @@
-import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function Header() {
+export default function Header({ username = "User" }) {
     const handleProfilePress = () => {
         console.log('Profile button pressed');
     };
 
     return (
-        <View style={styles.header}>
+        <SafeAreaView style={styles.header}>
             <View style={styles.textContainer}>
-                <Text style={styles.greetingbold}>Good morning,</Text>
-                <Text style={styles.greeting}>Sriyan!</Text>
+                <Text style={styles.greetingbold}>Welcome back!</Text>
             </View>
-
-            <TouchableOpacity
-                style={styles.profileButton}
-                onPress={handleProfilePress}
-                activeOpacity={0.7}
-            >
-                <Ionicons name="person-sharp" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -31,26 +22,25 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 20,
+        paddingVertical: 12,
         backgroundColor: '#0A5C27',
         borderBottomWidth: 1,
         borderBottomColor: '#e0e0e0',
     },
     textContainer: {
-        flexDirection: 'column',      // ⬅️ stack vertically
+        flexDirection: 'column',
     },
     greetingbold: {
         fontWeight: '700',
         color: '#FFFFFF',
-        fontSize: 20,
+        fontSize: 24,
         fontFamily: 'System',
-        marginBottom: -2,             // small tweak for spacing
+        //marginBottom: -2,
     },
     greeting: {
         fontWeight: '400',
         color: '#FFFFFF',
-        fontSize: 20,
+        fontSize: 24,
         fontFamily: 'System',
     },
     profileButton: {

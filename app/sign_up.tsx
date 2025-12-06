@@ -46,21 +46,28 @@ export default function SignUpScreen() {
             return;
         }
 
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
 
-        await setDoc(doc(db, "users", user.uid), {
-            uid: user.uid,
-            name,
-            email,
-            userType,       // 'teen' or 'senior'
-            createdAt: Date.now(),
-        });
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
 
-        if (userType === "teen") {
-            router.push("./teens/home");
-        } else {
-            router.push("./elders/home");
+            await setDoc(doc(db, "users", user.uid), {
+                uid: user.uid,
+                name,
+                email,
+                userType,       // 'teen' or 'senior'
+                createdAt: Date.now(),
+            });
+
+            if (userType === "teen") {
+                router.push("./elders/home");
+            } else {
+                router.push("./teens/home");
+            }
+        }
+        catch (error: any) {
+            console.log(error);
+            alert("Error signing up: " + error.message);
         }
     };
 

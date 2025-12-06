@@ -1,73 +1,92 @@
-import React from 'react';
 import {
+    collection,
+    doc,
+    onSnapshot,
+    orderBy,
+    query,
+    updateDoc,
+} from "firebase/firestore";
+import React, { useEffect, useState } from "react";
+import {
+    Alert,
     FlatList,
-    Image,
+    Linking,
     StatusBar,
     StyleSheet,
     Text,
     TouchableOpacity,
     useColorScheme,
     View,
-} from 'react-native';
-import Header from '../../components/header';
-import { Colors } from '../../constants/theme';
+} from "react-native";
+import Header from "../../components/header";
+import { auth, db } from "../../constants/firebase";
+import { Colors } from "../../constants/theme";
 
-// Mock data for gigs
-const MOCK_GIGS = [
-    {
-        id: '1',
-        title: 'Grocery Shopping',
-        description: 'Need help picking up groceries from the local store',
-        price: '$15',
-        postedBy: 'Emma S.',
-        category: 'Shopping',
-    },
-    {
-        id: '2',
-        title: 'Lawn Mowing',
-        description: 'Small front and back yard, about 30 minutes of work',
-        price: '$20',
-        postedBy: 'Jake M.',
-        category: 'Yard Work',
-    },
-    {
-        id: '3',
-        title: 'Tech Help',
-        description: 'Setting up new smartphone and email',
-        price: '$25',
-        postedBy: 'Sarah L.',
-        category: 'Technology',
-    },
-    {
-        id: '4',
-        title: 'Dog Walking',
-        description: '30 minute walk around the neighborhood',
-        price: '$12',
-        postedBy: 'Alex R.',
-        category: 'Pet Care',
-    },
-    {
-        id: '5',
-        title: 'Light Cleaning',
-        description: 'Dusting and vacuuming, 1-2 hours',
-        price: '$30',
-        postedBy: 'Maya P.',
-        category: 'Household',
-    },
-];
+interface Gig {
+    id: string;
+    title: string;
+    description: string;
+    price: string;
+    postedBy: string;
+    email?: string;
+    category: string;
+    location?: string;
+    date?: string;
+    status?: string;
+}
 
-export default function HomeScreen() {
+export default function EldersHome() {
     const colorScheme = useColorScheme();
-    const colors = Colors[colorScheme ?? 'light'];
+    const colors = Colors[colorScheme ?? "light"];
 
-    const handleGigPress = (gigId: string) => {
-        console.log('Gig pressed:', gigId);
-        // Navigate to gig details
-        // router.push(`/gig/${gigId}`);
+    const [gigs, setGigs] = useState<Gig[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const q = query(
+            collection(db, "gigs"),
+            orderBy("createdAt", "desc")
+        );
+
+        const unsub = onSnapshot(q, (snapshot) => {
+            const list: Gig[] = snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...(doc.data() as Omit<Gig, "id">),
+            }));
+            setGigs(list);
+            setLoading(false);
+        });
+
+        return () => unsub();
+    }, []);
+
+    // 📩 OPEN EMAIL APP
+    const contactTeen = (email?: string) => {
+        if (!email) return Alert.alert("No email provided");
+        const url = `mailto:${email}?subject=Gig%20Request&body=Hi!%20I'm%20interested%20in%20your%20gig.`;
+        Linking.openURL(url);
     };
 
-    const renderGigCard = ({ item }: { item: typeof MOCK_GIGS[0] }) => (
-        <TouchableOpacity
+    // 📌 BOOK A GIG
+    const bookGig = async (gigId: string) => {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        try {
+            await updateDoc(doc(db, "gigs", gigId), {
+                status: "booked",
+                bookedBy: user.uid,
+            });
+
+            Alert.alert("Gig Booked!", "You can see it in your upcoming gigs.");
+        } catch (error) {
+            console.log("Booking error:", error);
+            Alert.alert("Error", "Unable to book this gig.");
+        }
+    };
+
+    const renderGigCard = ({ item }: { item: Gig }) => (
+        <View
             style={[
                 styles.gigCard,
                 {
@@ -75,163 +94,117 @@ export default function HomeScreen() {
                     borderColor: colors.border,
                 },
             ]}
-            onPress={() => handleGigPress(item.id)}
         >
-            <View style={styles.gigCardContent}>
-                <Image style={styles.gigImage} source={require('../../assets/images/icon.png')} />
-                <View style={styles.gigInfo}>
-                    <View style={styles.gigHeader}>
-                        <Text style={[styles.gigTitle, { color: colors.text }]}>{item.title}</Text>
-                        <Text style={[styles.gigPrice, { color: colors.primary }]}>{item.price}</Text>
-                    </View>
-                    <Text style={[styles.gigDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                        {item.description}
-                    </Text>
-                    <View style={styles.gigFooter}>
-                        <View style={[styles.categoryBadge, { backgroundColor: colors.background }]}>
-                            <Text style={[styles.categoryText, { color: colors.textSecondary }]}>
-                                {item.category}
-                            </Text>
-                        </View>
-                        <Text style={[styles.postedBy, { color: colors.textTertiary }]}>
-                            by {item.postedBy}
-                        </Text>
-                    </View>
-                </View>
-            </View>
-        </TouchableOpacity>
+            <Text style={[styles.gigTitle, { color: colors.text }]}>
+                {item.title}
+            </Text>
+
+            <Text style={[styles.gigDescription, { color: colors.textSecondary }]}>
+                {item.description}
+            </Text>
+
+            <Text style={[styles.gigPrice, { color: colors.primary }]}>
+                {item.price}
+            </Text>
+
+            {/* 📞 Contact Button */}
+            <TouchableOpacity
+                style={[styles.emailButton, { backgroundColor: colors.primary }]}
+                onPress={() => contactTeen(item.email)}
+            >
+                <Text style={styles.emailButtonText}>Contact Senior</Text>
+            </TouchableOpacity>
+
+            {/* 📌 Book Button */}
+            {item.status !== "booked" ? (
+                <TouchableOpacity
+                    style={[styles.bookButton, { backgroundColor: colors.primary }]}
+                    onPress={() => bookGig(item.id)}
+                >
+                    <Text style={styles.bookButtonText}>Book Gig</Text>
+                </TouchableOpacity>
+            ) : (
+                <Text style={[styles.bookedTag, { color: colors.primary }]}>
+                    Already booked
+                </Text>
+            )}
+        </View>
     );
+
+    if (loading) {
+        return (
+            <View
+                style={[
+                    styles.container,
+                    {
+                        backgroundColor: colors.background,
+                        justifyContent: "center",
+                        alignItems: "center",
+                    },
+                ]}
+            >
+                <Text style={{ color: colors.text }}>Loading…</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
+            <StatusBar
+                barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
+            />
 
             <Header />
 
-            <View style={styles.content}>
-                {/* Browse Gigs Section */}
-                <View style={styles.browseSection}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Browse Gigs</Text>
-                    <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-                        Find helpful services from teens in your community
-                    </Text>
-                </View>
-
-                <FlatList
-                    data={MOCK_GIGS}
-                    renderItem={renderGigCard}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.gigList}
-                    showsVerticalScrollIndicator={false}
-                />
-            </View>
+            <FlatList
+                data={gigs}
+                keyExtractor={(item) => item.id}
+                renderItem={renderGigCard}
+                contentContainerStyle={{ padding: 20 }}
+            />
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    content: {
-        flex: 1,
-        paddingHorizontal: 20,
-    },
-    createButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 20,
-        paddingHorizontal: 24,
-        borderRadius: 16,
-        marginTop: 20,
-        marginBottom: 32,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    createButtonText: {
-        color: '#FFFFFF',
-        fontSize: 22,
-        fontWeight: '700',
-        marginLeft: 12,
-    },
-    browseSection: {
-        marginBottom: 20,
-    },
-    sectionTitle: {
-        fontSize: 24,
-        fontWeight: '700',
-        marginBottom: 6,
-    },
-    sectionSubtitle: {
-        fontSize: 15,
-        lineHeight: 20,
-    },
-    gigList: {
-        paddingBottom: 20,
-    },
+    container: { flex: 1 },
     gigCard: {
-        borderRadius: 16,
-        padding: 18,
-        marginBottom: 16,
+        padding: 16,
         borderWidth: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    gigCardContent: {
-        flexDirection: 'row',
-        gap: 14,
-    },
-    gigImage: {
-        width: 80,
-        height: 80,
         borderRadius: 12,
+        marginBottom: 16,
     },
-    gigInfo: {
-        flex: 1,
-    },
-    gigHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
+    gigTitle: { fontSize: 20, fontWeight: "700", marginBottom: 6 },
+    gigDescription: { fontSize: 15, marginBottom: 8 },
+    gigPrice: { fontSize: 18, fontWeight: "600", marginBottom: 12 },
+
+    emailButton: {
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: "center",
         marginBottom: 10,
     },
-    gigTitle: {
-        fontSize: 19,
-        fontWeight: '700',
-        flex: 1,
-        marginRight: 12,
+    emailButtonText: {
+        color: "white",
+        fontWeight: "700",
+        fontSize: 16,
     },
-    gigPrice: {
-        fontSize: 20,
-        fontWeight: '700',
-    },
-    gigDescription: {
-        fontSize: 15,
-        lineHeight: 21,
-        marginBottom: 12,
-    },
-    gigFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    categoryBadge: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
+
+    bookButton: {
+        paddingVertical: 10,
         borderRadius: 8,
+        alignItems: "center",
+        marginBottom: 10,
     },
-    categoryText: {
-        fontSize: 13,
-        fontWeight: '600',
+    bookButtonText: {
+        color: "white",
+        fontWeight: "700",
+        fontSize: 16,
     },
-    postedBy: {
-        fontSize: 13,
+
+    bookedTag: {
+        marginTop: 6,
+        fontSize: 16,
+        fontWeight: "700",
     },
 });
