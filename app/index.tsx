@@ -12,6 +12,7 @@ import { Colors } from '../constants/theme';
 
 export default function OnboardingScreen() {
   const colorScheme = useColorScheme();
+
   const colors = Colors[colorScheme ?? 'light'];
 
   return (

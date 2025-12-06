@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Header() {
     const handleProfilePress = () => {
@@ -9,7 +8,7 @@ export default function Header() {
     };
 
     return (
-        <SafeAreaView style={styles.header}>
+        <View style={styles.header}>
             <View style={styles.textContainer}>
                 <Text style={styles.greetingbold}>Good morning,</Text>
                 <Text style={styles.greeting}>Sriyan!</Text>
@@ -22,7 +21,7 @@ export default function Header() {
             >
                 <Ionicons name="person-sharp" size={24} color="#FFFFFF" />
             </TouchableOpacity>
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -32,7 +31,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingTop: 8,
+        paddingTop: 16,
         paddingBottom: 20,
         backgroundColor: '#0A5C27',
         borderBottomWidth: 1,
